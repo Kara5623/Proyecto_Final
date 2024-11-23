@@ -1,10 +1,85 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-# Diccionario de las instrucciones MIPS en formato binario (simplificado)
+# Mapa de opcodes para instrucciones
 opcode_map = {
-    'add': '0000', 'addi': '0001', 'lw': '0010', 'sw': '0011', 'beq': '0100', 'j': '0101'
+    'add': '000000', 'addi': '001000', 'lw': '100011', 'sw': '101011', 'beq': '000100', 'j': '000010'
 }
+
+# Función para convertir valores a binario de 32 bits
+def to_binary(value, length=32):
+    """Convierte un valor numérico a binario de longitud especificada (32 bits por defecto)."""
+    return bin(value)[2:].zfill(length)
+
+# Función para convertir instrucciones en formato binario
+def convert_instruction(instruction):
+    """Convierte una instrucción MIPS a su representación binaria en 32 bits."""
+    parts = instruction.split()
+    opcode = parts[0]
+    
+    if opcode == "add":
+        # Instrucción R-type: opcode, rs, rt, rd, shamt, funct
+        return f"{opcode_map['add']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2][1:]))} {to_binary(int(parts[3][1:]))} {'00000'} {'100000'}"
+    elif opcode == "addi":
+        # Instrucción I-type: opcode, rs, rt, immediate
+        return f"{opcode_map['addi']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2][1:]))} {to_binary(int(parts[3]))}"
+    elif opcode == "lw":
+        # Instrucción I-type: opcode, rt, base, offset
+        return f"{opcode_map['lw']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2]))} {to_binary(int(parts[3]))}"
+    elif opcode == "sw":
+        # Instrucción I-type: opcode, rt, base, offset
+        return f"{opcode_map['sw']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2]))} {to_binary(int(parts[3]))}"
+    elif opcode == "beq":
+        # Instrucción I-type: opcode, rs, rt, offset
+        return f"{opcode_map['beq']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2][1:]))} {to_binary(int(parts[3]))}"
+    elif opcode == "j":
+        # Instrucción J-type: opcode, address
+        return f"{opcode_map['j']} {to_binary(int(parts[1]))}"
+
+# Función para decodificar datos e instrucciones
+def decode_text(text_widget):
+    content = text_widget.get(1.0, tk.END).strip()
+    try:
+        lines = content.splitlines()
+        data_values = []
+        instructions = []
+        is_data = True
+
+        # Separar los datos de las instrucciones
+        for line in lines:
+            line = line.strip()
+            if line.startswith("//Mdatos"):
+                is_data = False
+                continue
+            if is_data:
+                if line.isdigit():
+                    data_values.append(int(line))  # Añadir los datos
+            elif line.startswith("//instrucciones"):
+                continue  # Saltar la cabecera de instrucciones
+            else:
+                instructions.append(line)
+
+        # Convertir los datos a binario (32 bits)
+        binary_data = [to_binary(value) for value in data_values]
+
+        # Convertir las instrucciones a binario
+        decoded_instructions = [convert_instruction(instruction) for instruction in instructions]
+
+        # Formato de salida
+        result = "Datos (en binario):\n"
+        result += "\n".join(binary_data) + "\n\n"
+        result += "Instrucciones (en binario, cada línea de 8 bits):\n"
+
+        # Convertir las instrucciones de 32 bits a 4 líneas de 8 bits
+        for instruction in decoded_instructions:
+            # Dividir cada instrucción de 32 bits en 4 líneas de 8 bits
+            result += '\n'.join([instruction[i:i+8] for i in range(0, len(instruction), 8)]) + '\n'
+
+        text_widget.delete(1.0, tk.END)
+        text_widget.insert(tk.END, result)
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to decode text: {str(e)}")
 
 # Función para seleccionar un archivo
 def select_file(text_widget):
@@ -36,75 +111,6 @@ def save_report(text_widget):
 def exit_app(window):
     if messagebox.askokcancel("Exit", "Are you sure you want to exit?"):
         window.destroy()
-
-# Función para convertir un número a binario de 4 bits
-def to_binary(value, length=4):
-    """Convierte un número a binario con un tamaño específico"""
-    return bin(value)[2:].zfill(length)
-
-# Función para convertir instrucciones en formato binario
-def convert_instruction(instruction):
-    parts = instruction.split()
-    opcode = parts[0]
-
-    if opcode == "add":
-        # R-type: opcode, rs, rt, rd, shamt, funct (usamos un formato simplificado de 4 bits)
-        return f"{opcode_map['add']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2][1:]))} {to_binary(int(parts[3][1:]))} 0000 1000"
-    elif opcode == "addi":
-        # I-type: opcode, rs, rt, immediate
-        return f"{opcode_map['addi']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2][1:]))} {to_binary(int(parts[3]))}"
-    elif opcode == "lw":
-        # I-type: opcode, rt, address (base + offset)
-        return f"{opcode_map['lw']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2]))}"
-    elif opcode == "sw":
-        # I-type: opcode, rt, address (base + offset)
-        return f"{opcode_map['sw']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2]))}"
-    elif opcode == "beq":
-        # I-type: opcode, rs, rt, offset
-        return f"{opcode_map['beq']} {to_binary(int(parts[1][1:]))} {to_binary(int(parts[2][1:]))} {to_binary(int(parts[3]))}"
-    elif opcode == "j":
-        # J-type: opcode, address
-        return f"{opcode_map['j']} {to_binary(int(parts[1]))}"
-
-# Función para decodificar datos e instrucciones
-def decode_text(text_widget):
-    content = text_widget.get(1.0, tk.END).strip()
-    try:
-        lines = content.splitlines()
-        data_values = []
-        instructions = []
-        is_data = True
-
-        for line in lines:
-            line = line.strip()
-            if line.startswith("//Mdatos"):
-                is_data = False  # Start reading instructions after the data section
-                continue
-            if is_data:
-                if line.isdigit():
-                    data_values.append(int(line))
-            elif line.startswith("//instrucciones"):
-                continue  # Skip the instructions header
-            else:
-                instructions.append(line)
-
-        # Convertir los datos a binario (4 bits)
-        binary_data = [to_binary(value, length=4) for value in data_values]
-
-        # Decodificar instrucciones de tipo 'add', 'addi', 'lw', etc.
-        decoded_instructions = [convert_instruction(instruction) for instruction in instructions]
-
-        # Mostrar los datos y las instrucciones convertidas a binario
-        result = "Datos (en binario):\n"
-        result += "\n".join(binary_data) + "\n\n"
-        result += "Instrucciones (en binario):\n"
-        result += "\n".join(decoded_instructions)
-
-        text_widget.delete(1.0, tk.END)
-        text_widget.insert(tk.END, result)
-
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to decode text: {str(e)}")
 
 # Crear la interfaz gráfica
 def create_gui():
